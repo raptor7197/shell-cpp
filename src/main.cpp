@@ -27,6 +27,9 @@ int main()
         else if (input.substr(0, 5) == "type ")
         {
             cout << "Showing info about " << input.substr(5) << endl;
+        } else if (input.substr(0,9)== "type echo" || input .substr(0,9) || input.substr(0,9)=="type type") {
+          cout << input.substr(5) + " is a shell builtin" << std::endl;
+
         }
         else
         {
