@@ -4,21 +4,25 @@ using namespace std;
 
 int main()
 {
-  cout << unitbuf;
-  cerr << unitbuf;
+    cout << unitbuf;
+    cerr << unitbuf;
 
-  cout << "$ ";
+    while (true) {
+        cout << "$ ";
 
-  string input;
-  getline(cin, input);
-  if (input == "exit 0")
-  {
-    exit(0);
-  } else if (input.find("echo")  != string::npos)
-  {
-    cout << input.substr(5) << endl;
-  }
-
-  cout << input << ": command not found" << endl;
-  main();
+        string input;
+        if (!getline(cin, input)) {
+            break;
+        }
+        
+        if (input == "exit 0") {
+            break;
+        }
+        else if (input.find("echo ") == 0) { // starts with "echo "
+            cout << input.substr(5) << endl;
+        }
+        else {
+            cout << input << ": command not found" << endl;
+        }
+    }
 }
