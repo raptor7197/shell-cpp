@@ -2,7 +2,8 @@
 #include <string>
 using namespace std;
 
-int main() {
+int main()
+{
   cout << unitbuf;
   cerr << unitbuf;
 
@@ -10,7 +11,12 @@ int main() {
 
   string input;
   getline(cin, input);
-  if (input == "exit 0") {exit(0);};  
+  if (input == "exit 0")
+  {
+    exit(0);
+  } else if {
+    input.find("echo")  != string::npos cout<< input.substr(5) << endl;
+  }
 
   cout << input << ": command not found" << endl;
   main();
