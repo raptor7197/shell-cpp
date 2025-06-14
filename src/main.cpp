@@ -4,7 +4,11 @@ using namespace std;
 
 bool isBuiltin(const string& command)
 {
-  return command == "echo" || command == "exit" || command == "type";
+  if (command == "echo" || command == "exit" || command == "type")
+  {
+    return true;
+  }
+  return false;
 }
 
 int main()
