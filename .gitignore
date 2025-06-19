@@ -339,7 +339,7 @@ GitHub.sublime-settings
 ##### Notepad++
 # Notepad++ backups #
 *.bak
-
+*.codecrafters
 ##### TextMate
 *.tmproj
 *.tmproject

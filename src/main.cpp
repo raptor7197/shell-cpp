@@ -1,69 +1,196 @@
 #include <iostream>
-#include <vector>
+#include <string>
+#include <map>
+#include <functional>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <filesystem>
 
-#include "builtin.h"
-#include "system.h"
+using namespace std;
 
-std::vector<std::string> parse_tokens(const std::string &input) {
-    std::vector<std::string> tokens;
-    std::string token;
-    bool in_double_quote = false;
-    bool in_quote = false;
+int echo(int argc, char* argv[]);
+int type(int argc, char* argv[]);
+string find_executable(const string& command);
 
-    // ignore just \n
-    if (input.empty()) {
-        return tokens;
-    }
-
-    for (char c : input) {
-        if (c == ' ' && !in_double_quote && !in_quote) {
-            if (!token.empty()) {
-                tokens.push_back(token);
-                token.clear();
-            }
-        } else if (c == '"' && !in_quote) {
-            in_double_quote = !in_double_quote;
-        } else if (c == '\'' && !in_double_quote) {
-            in_quote = !in_quote;
-        } else if (c != '\n' && c != '\r') {
-            token += c;
-        }
-    }
-
-    if (!token.empty()) {
-        tokens.push_back(token);
-    }
-
-    return std::move(tokens);
+int pwd(int argc, char* argv[]) {
+  char cwd[2048];
+  if (getcwd(cwd, sizeof(cwd)) != nullptr) {
+    cout << cwd << endl;
+    return 0;
+  } else {
+    cerr << "Error getting current working directory" << endl;
+    return 1;
+  }
 }
 
-std::vector<std::string> prompt() {
-    std::string input;
+int change_directory(int argc, char* argv[]) {
+  string target;
+  if (argc == 1) {
+    target = getenv("HOME");
+  }else{
+    target = argv[1];
+  }
 
-    std::cout << "$ ";
-    std::getline(std::cin, input);
-
-    return parse_tokens(input);
+  target.find("~") == 0 ? target.replace(0, 1, getenv("HOME")) : target;
+  target = filesystem::absolute(target).string();
+  if (chdir(target.c_str()) != 0) {
+    cerr << "cd: " << target << ": No such file or directory" << endl;
+    return 1;
+  }
+  return 0;
 }
 
-int main() {
-    std::cout << std::unitbuf;
-    std::cerr << std::unitbuf;
+const static map<string, function<int(int argc, char* argv[])>> COMMANDS = {
+    {"echo", echo},
+    {"type", type},
+    {"exit", nullptr},
+    {"pwd", pwd},
+    {"cd", change_directory},
+};
 
-    for (;;) {
-        std::vector<std::string> tokens = prompt();
-        std::string command = tokens[0];
+int echo(int argc, char* argv[]) {
+  if (argc < 2) {
+    cerr << "Usage: echo <message>" << endl;
+    return 1;
+  }
 
-        if (tokens.size() > 0) {
-            auto executable = find_executable(command);
+  for (int i = 1; i < argc; ++i) {
+    cout << argv[i] << " ";
+  }
+  cout << endl;
+  return 0;
+}
 
-            if (builtin_commands.find(command) != builtin_commands.end()) {
-                builtin_commands[command](tokens);
-            } else if (executable.has_value()) {
-                execute(executable.value(), tokens);
-            } else {
-                std::cout << command << ": command not found" << std::endl;
-            }
-        }
+int type(int argc, char* argv[]) {
+  if (argc < 2) {
+    cerr << "Usage: type <filename>" << endl;
+    return 1;
+  }
+  string command(argv[1]);
+
+  if (COMMANDS.find(command) != COMMANDS.end()) {
+    cout << command << " is a shell builtin" << endl;
+    return 0; 
+  }else{
+    string executable_path = find_executable(command);
+    if (!executable_path.empty()) {
+      cout << command << " is " << executable_path << endl;
+      return 0;
     }
+  }
+  cout << command << ": not found" << endl;
+  return 0;
+}
+
+string find_executable(const string& command) {
+  string path = getenv("PATH");
+  size_t pos = 0;
+  while ((pos = path.find(':')) != string::npos) {
+    string dir = path.substr(0, pos);
+    string full_path = dir + "/" + command;
+    if (access(full_path.c_str(), X_OK) == 0) {
+      return full_path;
+    }
+    path.erase(0, pos + 1);
+  }
+  return "";
+}
+
+
+vector<string> split(string s, char delimiter = ' ')
+{
+  string input = s;
+  vector<string> string_args;
+  int pos = 0;
+  while (pos != string::npos)
+  {
+    pos = input.find(delimiter);
+    auto token = string(input.substr(0, pos));
+    token.erase(remove_if(token.begin(), token.end(), [delimiter](char c){return c==delimiter;}), token.end());
+    input = input.substr(pos+1);
+    if (token.empty()) { continue; }
+    string_args.emplace_back(token);
+  }
+  return string_args;
+}
+
+int main(int argc, char* argv[]) {
+  // Flush after every cout / std:cerr
+  cout << unitbuf;
+  cerr << unitbuf;
+
+  while (true)
+  {
+
+    cout << "$ ";
+
+    vector<string> tokens;
+    bool in_quotes = false;
+    while (true)
+    {
+      string input;
+      getline(cin, input);
+      string this_token;
+      for (char& c : input) 
+      {
+        if (c == '\''){
+          in_quotes = !in_quotes; // Toggle in_quotes on single quote
+          continue;
+        } 
+        if (in_quotes || c != ' ') {
+          this_token += c;
+        } else {
+          if (!this_token.empty()) {
+            tokens.push_back(this_token);
+            this_token.clear();
+          }
+        }
+      }
+      if (!this_token.empty()) {
+        tokens.push_back(this_token);
+        this_token.clear();
+      }
+      if (!in_quotes) { break; } // Break if not in quotes
+    }
+
+
+    
+    
+
+    vector<string> string_args = tokens;
+    
+    if (string_args.empty()) { continue; }
+
+    char* arguments[1024];
+    for (size_t i = 0; i < string_args.size(); ++i) { arguments[i] = const_cast<char*>(string_args[i].c_str()); }
+    arguments[string_args.size()] = nullptr; // Null-terminate the array of arguments
+    int arg_count = string_args.size();
+    
+    string command = string_args[0];
+    if (COMMANDS.find(command) != COMMANDS.end())
+    {
+      if (command == "exit") {
+        int exit_code = 0;
+        if (arg_count > 1) {
+          exit_code = stoi(arguments[1]);
+        }
+        return exit_code; // Exit the shell
+      }
+      auto fun = COMMANDS.at(command);
+      if (fun) {fun(arg_count, arguments);}
+    }else if (find_executable(command) != "")
+    {
+      string executable_path = find_executable(command);
+      if (fork() == 0) {
+        execv(executable_path.c_str(), arguments);
+        cerr << "Failed to execute " << command << endl;
+        return 1; // Exit child process if exec fails
+      } else {
+        wait(nullptr); // Wait for the child process to finish
+      }
+    
+    }
+    else { cout << command << ": command not found" << endl; }
+  }
 }
