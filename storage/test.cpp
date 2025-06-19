@@ -1,8 +1,12 @@
+// this file is for added support for running external programs with arguments.
+
 #include <vector>
 #include <algorithm>
 #include <cstdlib>
 #include <filesystem>
 #include <iostream>
+#include <string>
+
 
 using namespace std;
 
@@ -30,10 +34,11 @@ int main()
     // Flush after every cout / std:cerr
     cout << unitbuf;
     cerr << unitbuf;
+    cout<<"This has the following commands for now exit echo and type \n";
 
     while (true)
     {
-        cout << "$ ";
+        cout << "$  ---> ";
 
         string input;
         getline(cin, input);

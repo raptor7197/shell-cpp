@@ -1,70 +1,69 @@
 #include <iostream>
-#include <string>
-#include <unordered_set>
-#include <filesystem>
+#include <vector>
 
-std::string cmd_in_path(const std::string& cmd) ;
+#include "builtin.h"
+#include "system.h"
 
-int main() {
-  // Flush after every std::cout / std:cerr
-  std::cout << std::unitbuf;
-  std::cerr << std::unitbuf;
-  std::unordered_set<std::string> cmds {"exit", "echo", "type"};
-  // Uncomment this block to pass the first stage
-  while (true)
-  {
-    std::cout << "$ ";
+std::vector<std::string> parse_tokens(const std::string &input) {
+    std::vector<std::string> tokens;
+    std::string token;
+    bool in_double_quote = false;
+    bool in_quote = false;
 
-    std::string input, cmd, args, cmd_path;
-    std::getline(std::cin, input);
-    cmd = input.substr(0, input.find_first_of(' '));
-    args = input.substr(input.find_first_of(' ') + 1);
+    // ignore just \n
+    if (input.empty()) {
+        return tokens;
+    }
 
-    if(cmd == "exit") {
-      exit(stoi(args));
+    for (char c : input) {
+        if (c == ' ' && !in_double_quote && !in_quote) {
+            if (!token.empty()) {
+                tokens.push_back(token);
+                token.clear();
+            }
+        } else if (c == '"' && !in_quote) {
+            in_double_quote = !in_double_quote;
+        } else if (c == '\'' && !in_double_quote) {
+            in_quote = !in_quote;
+        } else if (c != '\n' && c != '\r') {
+            token += c;
+        }
     }
-    else if(cmd == "echo") {
-      std::cout << args << std::endl;
+
+    if (!token.empty()) {
+        tokens.push_back(token);
     }
-    else if(cmd == "type") {
-      if(cmds.find(args) != cmds.end()) {
-        std::cout << args << " is a shell builtin" << std::endl;
-      }
-      else if(cmd_path = cmd_in_path(args); !cmd_path.empty()) {
-        std::cout << args << " is " << cmd_path << std::endl;
-      }
-      else {
-        std::cout << args << ": not found"<< std::endl;
-      }
-    }
-    else if(cmd_path = cmd_in_path(cmd); !cmd_path.empty()) {
-        int res = system(input.c_str());
-    }
-    else {
-      std::cout << input << ": command not found" << std::endl;
-    }
-  }
+
+    return std::move(tokens);
 }
 
-std::string cmd_in_path(const std::string& cmd) {
-  std::string path = getenv("PATH");
-  std::string search_dir;
-  int left_occ = 0;
+std::vector<std::string> prompt() {
+    std::string input;
 
-  for(int i = 0; i < path.size(); i++) {
-    if(path[i] == ':') {
-      search_dir = path.substr(left_occ, i - left_occ);
-      if(std::filesystem::exists(search_dir + '/' + cmd)) {
-        return search_dir + '/' + cmd;
-      }
-      left_occ = i + 1;
+    std::cout << "$ ";
+    std::getline(std::cin, input);
+
+    return parse_tokens(input);
+}
+
+int main() {
+    std::cout << std::unitbuf;
+    std::cerr << std::unitbuf;
+
+    for (;;) {
+        std::vector<std::string> tokens = prompt();
+        std::string command = tokens[0];
+
+        if (tokens.size() > 0) {
+            auto executable = find_executable(command);
+
+            if (builtin_commands.find(command) != builtin_commands.end()) {
+                builtin_commands[command](tokens);
+            } else if (executable.has_value()) {
+                execute(executable.value(), tokens);
+            } else {
+                std::cout << command << ": command not found" << std::endl;
+            }
+        }
     }
-  }
-
-  search_dir = path.substr(path.find_last_of(':'));
-  if(std::filesystem::exists(search_dir + '/' + cmd)) {
-        return search_dir + '/' + cmd;
-  }
-
-  return "";
 }
